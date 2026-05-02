@@ -1,10 +1,15 @@
 --[[
+0.9.3 
+	- fix: luster trajectory adjusted in server mode
+	- added: smoke effect with deletion after 10s
+	- server mode forced to have only one mechanism to manage cluster trajectory, local mode is keept to have the possibility to go back to the previous mechanism if some issues are found with the new one, but the old one is not maintained anymore
+
 0.9.2
-	- new: Cluster's trajectory management with wind corretions, server mode and local mode, munitions tested BLU-108 BLU-97Band MK 118 (CBU-99) only
-	- fix clustor box axe calculation
-	- fix multi-cluster trajectory management (deepcopy)
-	- begining of inline documentation
-	- fix life request for scenary objects
+- new: Cluster's trajectory management with wind corretions, server mode and local mode, munitions tested BLU-108 BLU-97Band MK 118 (CBU-99) only
+- fix clustor box axe calculation
+- fix multi-cluster trajectory management (deepcopy)
+- begining of inline documentation
+- fix life request for scenary objects
 
 0.9.1
 	- new: Cluster's trajectory management, munitions tested BLU-108 only
@@ -54,7 +59,7 @@ do
 		mnuStatistics = { ON = nil, OFF = nil }, -- add a menu to enable/disable messages in game
 
 		isMultiPlayer = false,             -- false when the script is running in local mode
-		version = "0.9.2",                 -- current version
+		version = "0.9.3",                 -- current version
 	}
 	BLAST.__index = BLAST
 
@@ -93,8 +98,7 @@ do
 		msgStatistics = true,            -- log for statistics
 
 		smoke = false,                    -- show a smoke for the impact point or zones
-		smokeColor = trigger.smokeColor.White, -- available colors : Green Red White Orange Blue
-
+		smokeId = 0,
 
 		-- telemetry to trace munitions between start tracking and when DCS destroy munition
 		telemetryManaged = false, -- if telemetry enabled, you have to unsanitize "lfs" in MissionScript.lua
@@ -192,7 +196,7 @@ do
 
 		["CBU_87"] = { category = Weapon.Category.BOMB, flare = true, clusterName = "BLU-97B" },
 		["CBU_97"] = { category = Weapon.Category.BOMB, flare = true, clusterName = "BLU-108" },
-		["CBU_99"] = { category = Weapon.Category.BOMB, flare = true, clusterName = "BLU-108" },
+		["CBU_99"] = { category = Weapon.Category.BOMB, flare = true, clusterName = "Mk 118" },
 		["ROCKEYE"] = { category = Weapon.Category.BOMB, flare = true, clusterName = "Mk 118" },
 
 		["Durandal"] = { category = Weapon.Category.BOMB, TNTe = 320 }, -- New
@@ -468,25 +472,27 @@ do
 		["Mk 118"] = { -- CBU-99 sub-munitions / ROCKEYE / MK-20
 			count = 20, -- number of explosions
 			TNTe = 0.980, -- power eq. TNT real 0.180gr
-			lenght = 120, -- length of zone
-			width = 85, -- width of zone
+			lenght = 80, -- length of zone
+			width = 120, -- width of zone
 			disp = 1.2, -- dispersion (%) of the initial zone size
 			physics = { -- physicals props  BLU and skeets
 				m0 = 0.6, -- mass during step 1 of flight (kg)
 				s0 = 0.01, -- surface (m²)
-				cx0 = 1.40, -- Drag coef step 1 (no unit)
-				sx0 = 0.28, -- Lift coef step 1 (no unit)
+				cx0 = 0.11, -- Drag coef step 1 (no unit)
+				sx0 = 0.01, -- Lift coef step 1 (no unit)
 
 				m1 = 0.00, -- mass during step 2 of flight (kg)
 				s1 = 0.00, -- surface (m²)
 				cx1 = 0.0, -- Drag coef step 2 (no unit)
 				sx1 = 0.0, -- Lift coef step 2 (no unit)
 
-				sr = 1.0, -- speed rate when cluster is ejected
+				sr = 1.5, -- speed rate when cluster is ejected
 				mh = 50.0, -- minimal height of IP
 				de = 0, -- delay between step 1 and 2 of the trajectory
 				we = 1.0, -- wind effect (no unit)
-				di = 0.6 -- dispersion (%) of the initial zone size
+				di = 0.6, -- dispersion (%) of the initial zone size
+				dx = 70, -- distance shift between skeets when cluster is ejected in server mode (m)
+				dz = 0 -- distance shift between skeets when cluster is ejected in server mode (m)
 			}
 		},
 
@@ -510,8 +516,10 @@ do
 				sr = 1.0, -- speed rate when cluster is ejected
 				mh = 120.0, -- minimal height of IP
 				de = 0, -- delay between step 1 and 2 of the trajectory
-				we = 1.0, -- wind effect (no unit)
-				di = 0.2 -- dispersion (%) of the initial zone size
+				we = -0.1, -- wind effect (no unit)
+				di = 1.2, -- dispersion (%) of the initial zone size
+				dx = 190, -- distance shift between skeets when cluster is ejected in server mode (m)
+				dz = -80 -- distance shift between skeets when cluster is ejected in server mode (m)
 			}
 		},
 		["BLU-108"] = { -- CBU-97 sub-munitions
@@ -534,8 +542,10 @@ do
 				sr = 1.378, -- speed rate when cluster is ejected
 				mh = 50.0, -- minimal height of IP
 				de = 4.5, -- delay between step 1 and 2 of the trajectory
-				we = 1.0, -- wind effect (no unit)
-				di = 0.2 -- dispersion (%) of the initial zone size
+				we = 0.5, -- wind effect (no unit)
+				di = 1.2, -- dispersion (%) of the initial zone size
+				dx = 300, -- distance shift between skeets when cluster is ejected for server mode (m)
+				dz = 0 -- distance shift between skeets when cluster is ejected for server mode (m)
 			}
 		},
 		["BLU-97/B"] = { -- CBU-97 sub-munitions
@@ -559,12 +569,14 @@ do
 				mh = 120.0, -- minimal height of IP
 				de = 0, -- delay between step 1 and 2 of the trajectory
 				we = 1.0, -- wind effect (no unit)
-				di = 1.8 -- dispersion (%) of the initial zone size
+				di = 1.8, -- dispersion (%) of the initial zone size
+				dx = 300, -- distance shift between skeets when cluster is ejected for server mode (m)
+				dz = 0 -- distance shift between skeets when cluster is ejected for server mode (m)
 			}
 		}
 	}
 
-	-- Naes of modes
+	-- Names of modes
 	BLAST.ModesNames = {
 		[false] = "local",
 		[true] = "server"
@@ -674,6 +686,32 @@ do
 				trigger.action.outText(s, 10)
 			end
 		end
+	end
+
+	---add a smoke at position pos with default setup and autoclean after a delay
+	---@param pos vec3 position of the smoke
+	---@param preset integer size and style of the smoke, 1 to 8 (default: 5)
+	---@param density number density of the smoke, 0 to 1 (default: 0.5)
+	---@param name string id of the smoke, used for autoclean (default: "smokeId counter")
+	---@param delay number delay before autoclean (default: 10)
+	BLAST.doSmoke = function(pos, preset , density, name, delay)
+		if not pos then
+			BLAST.info("BLAST.doSmoke: no position given")
+			return
+		end
+		
+		BLAST.options.smokeId = BLAST.options.smokeId + 1
+
+		preset = preset or 5
+		density = density or 0.5
+		name = name or string.format("bsmoke_%03d", BLAST.options.smokeId)
+
+		trigger.action.effectSmokeBig( pos, preset, density, name)	
+		timer.scheduleFunction(
+			function(name)
+				trigger.action.effectSmokeStop(name)
+			end, name, timer.getTime() + (delay or 10)
+		)
 	end
 
 	-- format a string with diff between start and end time
@@ -990,13 +1028,20 @@ do
 		return BLAST.vec2(x, y)
 	end
 
-	-- translate point p with range d
+	--- translate point p (vec3) with range d (vec3)
+	--- @param p vec3 the point to translate
+	--- @param d vec3 the translation vector
+	--- @return vec3 translated point
 	BLAST.translateVec3 = function(p, d)
 		local result = BLAST.vec3(p.x + d.x, p.y + d.y, p.z + d.z)
 		return result
 	end
 
-	-- get true if a point p is in the radius r of center c
+	-- get true if a point p (vec3)is in the radius r (m) of center c (vec3)
+	---@param p vec3 point to check
+	---@param c vec3 center of the circle
+	---@param r number radius of the circle (m)
+	---@return boolean when p is in the radius of c
 	BLAST.inRadius = function(p, c, r)
 		local result = ((p.x - c.x) ^ 2 + (p.y - c.y) ^ 2) ^ 0.5 <= r
 		return result
@@ -1276,12 +1321,12 @@ do
 				track.cluster.box = BLAST.getSearchBox(track.cluster.polygon)
 
 				-- a cloud of smoke to see where is the box BLAST.getGroundHeight( track.position.ip )
-				if BLAST.options.debugManaged and BLAST.options.smoke then
-					trigger.action.smoke(track.cluster.ip, trigger.smokeColor.Red)
-					trigger.action.smoke(track.cluster.polygon[1], trigger.smokeColor.Green)
-					trigger.action.smoke(track.cluster.polygon[2], trigger.smokeColor.Red)
-					trigger.action.smoke(track.cluster.polygon[3], trigger.smokeColor.White)
-					trigger.action.smoke(track.cluster.polygon[4], trigger.smokeColor.Blue)
+				if BLAST.options.smoke then
+					BLAST.doSmoke(track.cluster.ip, 1)
+					BLAST.doSmoke(track.cluster.polygon[1])
+					BLAST.doSmoke(track.cluster.polygon[2])
+					BLAST.doSmoke(track.cluster.polygon[3])
+					BLAST.doSmoke(track.cluster.polygon[4])
 				end
 			end
 		end
@@ -1362,12 +1407,13 @@ do
 		return result
 	end
 
+	--- get the impact point of a cluster with a trajectory simulation
+	--- @param position vec3 position of the cluster at the moment of separation
+	--- @param velocity vec3 velocity of the cluster at the moment of separation
+	--- @param heading number heading of the cluster at the moment of separation
+	--- @param physics table physical properties and behaviours of the cluster
+	BLAST.getClusterIP = function(position, velocity, heading, physics)
 
-	BLAST.getClusterIP = function(
-		position, -- Position (vec3)
-		velocity, -- Velocity (vec3)
-		physics -- Physical properties and behaviours of the cluster
-	)
 		-- get wind layers
 		local alt = BLAST.getGroundHeight(position)
 		local winds = BLAST.getWinds(position, BLAST.windStep, alt)
@@ -1474,11 +1520,21 @@ do
 			end
 		end
 
+		-- shift position of ip to the ground level in server mode to avoid issues 
+		if BLAST.isMultiPlayer then
+			local shift = BLAST.vec3(math.cos(heading)*physics.dx, 0, math.sin(heading)*physics.dx)
+			BLAST.info(string.format("shift = {x=%.0f,y=%.0f,z=%.0f}", shift.x, shift.y, shift.z))
+			BLAST.info(string.format("avant ip={x=%.0f,y=%.0f,z=%.0f}", ip.x, ip.y, ip.z))
+			ip = BLAST.translateVec3(ip, shift)
+			ip.z = ip.z + physics.dz
+			BLAST.info(string.format("après ip={x=%.0f,y=%.0f,z=%.0f}", ip.x, ip.y, ip.z))
+		end
+
 		if BLAST.options.debugManaged then
 			BLAST.info(string.format("délai %.3fs, ip={x=%.0f,y=%.0f,z=%.0f}", et, ip.x, ip.y, ip.z))
-			if BLAST.options.smoke then
-				trigger.action.smoke(ip, trigger.smokeColor.Orange)
-			end
+		end
+		if BLAST.options.smoke then
+			BLAST.doSmoke(ip, 1)
 		end
 
 		return ip, et
@@ -1833,7 +1889,7 @@ do
 		end
 
 		if BLAST.options.debugManaged and BLAST.options.smoke then
-			trigger.action.smoke(track.ip, BLAST.options.smokeColor)
+			BLAST.doSmoke(track.ip, 1)
 		end
 
 		-- proceed to the standard damages with the power of weapon set
@@ -2002,8 +2058,8 @@ do
 						track.cluster.ip = track.cluster.position.p
 						track.cluster.ip.y = BLAST.getGroundHeight(track.cluster.ip)
 
-						if BLAST.options.debugManaged and BLAST.options.smoke then
-							trigger.action.smoke(track.cluster.ip, BLAST.options.smokeColor)
+						if BLAST.options.smoke then
+							BLAST.doSmoke(track.cluster.ip, 1)
 						end
 
 						timer.scheduleFunction(
@@ -2059,13 +2115,13 @@ do
 
 					-- server mode : trajectory simulation
 					else
-						if BLAST.options.debugManaged and BLAST.options.smoke then
-							trigger.action.smoke(track.position.p, BLAST.options.smokeColor)
+						if BLAST.options.smoke then
+							BLAST.doSmoke(track.position.p)
 						end
 
 						-- get cluster IP and elapsTime of the bomblet's strike zone	
 						track.cluster = self:getCluster(nil, id)
-						track.cluster.ip, track.cluster.elapsTime = BLAST.getClusterIP(track.position.p, track.velocity,
+						track.cluster.ip, track.cluster.elapsTime = BLAST.getClusterIP(track.position.p, track.velocity, track.heading,
 							BLAST.clusters[track.clusterName].physics)
 						track.cluster.id = -1 -- no real cluster, only simulated
 						track.cluster.ip.y = BLAST.getGroundHeight(track.cluster.ip)
@@ -2168,7 +2224,7 @@ BLAST.info( s )
 						track.hit = track.hit + 1
 						-- when a weapon tracked hit something					
 
-						if track.object and ((track.object.category == Object.Category.UNIT) or (track.object.category == Object.Category.STATIC) or (track.object.category == Object.Category.SCENERY)) then
+						if track.object and ((track.object.category == Object.Category.UNIT) or (track.object.category == Object.Category.STATIC)) then -- or (track.object.category == Object.Category.SCENERY)) then
 							-- nothing else to do for a tracked weapon
 							local pctlife = math.floor((track.object.health / track.object.life) * 100)
 							BLAST.info(string.format("Weapon %s %s:%s (%i) HIT %s:%s, fired by %s, health %i%%",
@@ -2679,7 +2735,7 @@ BLAST.info( s )
 			if DCS then
 				BLAST.isMultiPlayer = DCS.isMultiplayer() -- DCS.isServer()
 			end
-
+BLAST.isMultiPlayer = true
 			self.exclusionAreas = BLAST.getExclusionAreas(self.options.areasPattern)
 
 			-- add handle to track weapons
@@ -2739,7 +2795,7 @@ BLAST.info( s )
 		end
 
 		self.options.state = flag
-		BLAST.info(string.format("BLAST version %s, %s mode", self.version, BLAST.ModesNames[BLAST.isMultiPlayer]))
+		BLAST.info(string.format("BLAST version %s, %s mode", self.version, BLAST.ModesNames[BLAST.isMultiPlayer]), true)
 	end
 
 	function BLAST:start()
