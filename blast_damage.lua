@@ -1,15 +1,15 @@
 --[[
 0.9.3 
-	- fix: luster trajectory adjusted in server mode
+	- fix: cluster trajectory adjusted in server mode
 	- added: smoke effect with deletion after 10s
 	- server mode forced to have only one mechanism to manage cluster trajectory, local mode is keept to have the possibility to go back to the previous mechanism if some issues are found with the new one, but the old one is not maintained anymore
 
 0.9.2
-- new: Cluster's trajectory management with wind corretions, server mode and local mode, munitions tested BLU-108 BLU-97Band MK 118 (CBU-99) only
-- fix clustor box axe calculation
-- fix multi-cluster trajectory management (deepcopy)
-- begining of inline documentation
-- fix life request for scenary objects
+	- new: Cluster's trajectory management with wind corretions, server mode and local mode, munitions tested BLU-108 BLU-97Band MK 118 (CBU-99) only
+	- fix clustor box axe calculation
+	- fix multi-cluster trajectory management (deepcopy)
+	- begining of inline documentation
+	- fix life request for scenary objects
 
 0.9.1
 	- new: Cluster's trajectory management, munitions tested BLU-108 only

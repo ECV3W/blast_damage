@@ -39,7 +39,7 @@ CONDITIONS : "should stay empty"
 ACTIONS : DO SCRIPT FILE and select blast_damage.lua
 ```
 
-### Problèmes connus
+### Know issues
 
 - Cluster visual effects can overload a server if too many clusters explode simultaneously.
 - Avoid situations such as invicible units receiving unlimited ammunition. The effects can be more or less pronounced in multiplayer, depending on latency.
